@@ -16,7 +16,7 @@ import java.util.Scanner;
 public class GooglePlayCategorizer {
 
     private static final String FILE_NAME = "category_app.txt";
-    private static final String GOOGLE_PLAY_URL = "https://play.google.com/store/apps/details?id=";
+    private static final String GOOGLE_PLAY_URL = "https://play.google.com/store/apps/details?hl=en&id=";
     private static String FILE_PATH;
 
     private static Logger logger = PulseLogger.getLogger(GooglePlayCategorizer.class);
@@ -66,7 +66,7 @@ public class GooglePlayCategorizer {
                     // check
                     if (strings.length == 2) {
                         strings = strings[1].split("</span>");
-                        category = strings[0];
+                        category = strings[0].replace("&amp;", "&");
                     }
 
                 } catch (Exception ex) {

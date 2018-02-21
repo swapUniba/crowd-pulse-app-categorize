@@ -2,8 +2,10 @@ package com.github.swapUniba.pulse.crowd.appcategorize;
 
 import com.github.frapontillo.pulse.crowd.data.entity.PersonalData;
 import com.github.frapontillo.pulse.spi.IPlugin;
-import com.github.frapontillo.pulse.spi.VoidConfig;
+import com.github.frapontillo.pulse.spi.IPluginConfig;
+import com.github.frapontillo.pulse.spi.PluginConfigHelper;
 import com.github.frapontillo.pulse.util.PulseLogger;
+import com.google.gson.JsonElement;
 import org.apache.logging.log4j.Logger;
 import rx.Observable.Operator;
 import rx.Subscriber;
@@ -16,7 +18,7 @@ import rx.observers.SafeSubscriber;
  * @author Fabio De Pasquale
  *
  */
-public class AppCategorizer extends IPlugin<PersonalData, PersonalData, VoidConfig> {
+public class AppCategorizer extends IPlugin<PersonalData, PersonalData, AppCategorizer.AppCategorizerConfig> {
 
     private static final String PLUGIN_NAME = "app-categorize";
     private static final String APP_INFO = "appinfo";
@@ -28,12 +30,12 @@ public class AppCategorizer extends IPlugin<PersonalData, PersonalData, VoidConf
     }
 
     @Override
-    public VoidConfig getNewParameter() {
-        return new VoidConfig();
+    public AppCategorizerConfig getNewParameter() {
+        return new AppCategorizerConfig();
     }
 
     @Override
-    protected Operator<PersonalData, PersonalData> getOperator(VoidConfig params) {
+    protected Operator<PersonalData, PersonalData> getOperator(AppCategorizerConfig params) {
         return subscriber -> new SafeSubscriber<>(new Subscriber<PersonalData>() {
 
             @Override
@@ -52,17 +54,79 @@ public class AppCategorizer extends IPlugin<PersonalData, PersonalData, VoidConf
             public void onNext(PersonalData appInfo) {
                 if (appInfo.getSource().equals(APP_INFO)) {
                     reportElementAsStarted(appInfo.getPackageName());
+                    GooglePlayCategorizer categorizer;
 
-                    GooglePlayCategorizer categorizer = new GooglePlayCategorizer(appInfo.getPackageName());
-                    appInfo.setCategory(categorizer.getCategory());
+                    if (params != null) {
+                        switch (params.getCalculate()) {
+                            case AppCategorizerConfig.ALL:
+                                categorizer = new GooglePlayCategorizer(appInfo.getPackageName());
+                                appInfo.setCategory(categorizer.getCategory());
+                                logger.info("App package name: " + appInfo.getPackageName() + " -- Category found: " + appInfo.getCategory());
+                                break;
 
-                    logger.info("App package name: " + appInfo.getPackageName() + " -- Category found: " + appInfo.getCategory());
+                            case AppCategorizerConfig.NEW:
+                                if (appInfo.getCategory() == null) {
+                                    categorizer = new GooglePlayCategorizer(appInfo.getPackageName());
+                                    appInfo.setCategory(categorizer.getCategory());
+                                    logger.info("App package name: " + appInfo.getPackageName() + " -- Category found: " + appInfo.getCategory());
+                                } else {
+                                    logger.info("App skipped (category already exists)");
+                                }
+                                break;
+
+                            default:
+                                categorizer = new GooglePlayCategorizer(appInfo.getPackageName());
+                                appInfo.setCategory(categorizer.getCategory());
+                                logger.info("App package name: " + appInfo.getPackageName() + " -- Category found: " + appInfo.getCategory());
+                                break;
+                        }
+                    } else {
+
+                        // as default case
+                        categorizer = new GooglePlayCategorizer(appInfo.getPackageName());
+                        appInfo.setCategory(categorizer.getCategory());
+                        logger.info("App package name: " + appInfo.getPackageName() + " -- Category found: " + appInfo.getCategory());
+                    }
 
                     reportElementAsEnded(appInfo.getPackageName());
                 }
                 subscriber.onNext(appInfo);
             }
         });
+    }
+
+
+    class AppCategorizerConfig implements IPluginConfig<AppCategorizerConfig> {
+
+        /**
+         * Get the category of all applications coming from the stream.
+         */
+        public static final String ALL = "all";
+
+        /**
+         * Get the category of the applications with no category (property is null).
+         */
+        public static final String NEW = "new";
+
+
+        /**
+         * Accepted values: NEW, ALL.
+         * Default: ALL.
+         */
+        private String calculate;
+
+        @Override
+        public AppCategorizerConfig buildFromJsonElement(JsonElement jsonElement) {
+            return PluginConfigHelper.buildFromJson(jsonElement, AppCategorizerConfig.class);
+        }
+
+        public String getCalculate() {
+            return calculate;
+        }
+
+        public void setCalculate(String calculate) {
+            this.calculate = calculate;
+        }
     }
 
 }
